@@ -9,10 +9,10 @@
 
 Service::Service(SecureConnectionPtr connection,
 		 const std::string& scheme,
-		 const std::string& config)
+		 const std::string& configText)
   : m_connection(connection),
     m_scheme(scheme),
-    m_config(config)
+    m_configText(configText)
 {
   registerAttribute("connection", connection, true);
   registerAttribute("scheme",     scheme, true);

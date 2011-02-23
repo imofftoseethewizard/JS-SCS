@@ -254,18 +254,6 @@ FB::VariantList SecureConnection::get_services() const
 {
   
   return FB::make_variant_list(m_services);
-    /* Exec non-blocking on the remove host */
-  /*    while( (channel = libssh2_channel_open_session(session)) == NULL &&
-           libssh2_session_last_error(session,NULL,NULL,0) ==
-           LIBSSH2_ERROR_EAGAIN )
-    {
-        waitsocket(sock, session);
-    }
-    if( channel == NULL )
-    {
-        fprintf(stderr,"Error\n");
-        exit( 1 );
-	}*/
 }
 
 
@@ -311,6 +299,9 @@ bool predicate(const std::string& s1, const std::string& s2)
 
 void SecureConnection::requestServiceByScheme(const std::string& scheme)
 {
+  if (m_readyState != OPEN)
+    throw FB::script_error("Connection is not open.");
+
   LIBSSH2_SFTP_HANDLE *config = NULL;
   std::stringstream config_text;
 
@@ -616,6 +607,12 @@ void SecureConnection::authenticate()
     throw FB::script_error("Invalid username or password");
 
   m_password = "";
+}
+
+void SecureConnection::openSftpChannel()
+{
+  if (!m_sftp && !(m_sftp = libssh2_sftp_init(m_session)))
+    throw FB::script_error("Unable to initialize SFTP channel.");
 }
 
 

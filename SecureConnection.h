@@ -23,6 +23,8 @@ FB_FORWARD_PTR(SecureConnection);
 class SecureConnection : public FB::JSAPIAuto
 {
  public:
+  friend class FileService;
+
   SecureConnection(SecureConnectionServicesPtr plugin,
 		   const std::string& user,
 		   const std::string& hostName,

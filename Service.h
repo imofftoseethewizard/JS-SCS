@@ -19,7 +19,7 @@ class Service : public FB::JSAPIAuto
   Service();
   Service(SecureConnectionPtr connection,
 	  const std::string& scheme,
-	  const std::string& config);
+	  const std::string& configText);
 
   virtual ~Service();
 
@@ -30,7 +30,7 @@ class Service : public FB::JSAPIAuto
 
  protected:
   std::string m_scheme;
-  std::string m_config;
+  std::string m_configText;
   SecureConnectionWeakPtr m_connection;
   
  private:
@@ -38,6 +38,6 @@ class Service : public FB::JSAPIAuto
 
 typedef ServicePtr *(ServiceFactory)(SecureConnectionPtr connection,
 				     const std::string& scheme,
-				     const std::string& config);
+				     const std::string& configText);
 
 #endif // H_Service

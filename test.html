@@ -1,0 +1,28 @@
+<!--
+    Auto-generated test-site
+-->
+<html>
+<head>
+<title>Test Page for SCS</title>
+</head>
+    <script type="text/javascript">
+        function plugin()
+        {
+            return document.getElementById('plugin0');
+        }
+
+        function pluginLoaded() {
+	    x = plugin();
+	    y = x.SecureConnection("pat", "localhost");
+	    y.addEventListener("error", function() { console.log("error", arguments) });
+	    y.addEventListener("readystatechange", function() { console.log("rsc", arguments) });
+	    y.addEventListener("grant", function() { console.log("grant", arguments); });
+        }
+        
+    </script>
+<body>
+  <object id="plugin0" type="application/x-secureconnectionservices" width="200" height="50">
+    <param name="onload" value="pluginLoaded" />
+  </object>
+</body>
+</html>

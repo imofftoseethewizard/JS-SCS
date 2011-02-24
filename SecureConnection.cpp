@@ -335,6 +335,9 @@ void SecureConnection::requestServiceByScheme(const std::string& scheme)
     libssh2_sftp_close(config);
     config = NULL;
 
+    // TODO scheme->constructor registry
+    grantService(FileService::create(FB::ptr_cast<SecureConnection>(shared_from_this()),
+				     scheme, config_text.str()));
   }
   catch (FB::script_error e) 
   {
@@ -342,9 +345,6 @@ void SecureConnection::requestServiceByScheme(const std::string& scheme)
       libssh2_sftp_close(config);
     reportError(e);
   }
-  // TODO scheme->constructor registry
-  grantService(FileService::create(FB::ptr_cast<SecureConnection>(shared_from_this()),
-				   scheme, config_text.str()));
 }
 
 

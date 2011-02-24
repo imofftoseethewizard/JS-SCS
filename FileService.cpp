@@ -2,19 +2,110 @@
 
   FileService.cpp
 
-  TODO:
-  function to check requested path vs config permissions
-  normalize specifiers for double slashes, and single and double dots
-  
-  give regexes for the config lines a suffix to capture all subtree elements
-    + /?.*$
+  Config File
 
-  use (re = cl.getGlobRegex()) with regex_match on the target
+  The config file for FileService is located at .jsscs/config/file.
+
+  Format
+
+  The config file is divided into sections by section headers enclosed in
+  brackets. Each section header must be on a line by itself. Whitespace can be
+  inserted around the section name or before and after the brackets. Only the
+  following sections are valid, all others will be an error: noaccess,
+  readonly, writeonly, readwrite, and override.
+
+  Each section can contain one or more specifiers. A specifier begins with an
+  optional number of indentation characters, either spaces or tabs. This is
+  followed by either a + or a -, optional whitespace, the path the specifier
+  refers to, and then optional whitespace before the newline.
+
+  Indentation is significant and is counted as the number of characters, so in
+  the interest of sanity for those who read the file, please use either all
+  spaces or all tabs, as to mix them would be horribly confusing. Each
+  specifier may have an indentation level between 0 and one more than the line
+  above it. Greater jumps in indentation are not allowed.
+
+  The path a specifier contains is required to be absolute if the specifier
+  has no leading indentation; conversely if the specifier is indented, then it
+  must be a relative path.
+
+  Specifiers are arranged into a tree in the natural sense, according to their
+  relative indentation levels and vertical positions in the file. Child
+  specifiers refine parents, and the last sibling dominates.
+
+  A plus at the start of a specifier indicates that the named file or subtree
+  should be added to the set paths possessing the permissions implied by the
+  containing section; a minus indicates that the named file or subtree should
+  be unaffected. Thus
+
+    [readwrite]
+    - /usr/src
+
+  does not mean that /usr/src has neither read nor write permission, but that
+  this section does not alter the permissions on /usr/src.  
+
+  [noaccess]
+  
+  Paths matching the specifiers following a noaccess section heading will be
+  available for neither reading nor writing.
+
+  [readonly]
+
+  Paths matching the specifiers following a readonly section heading will be
+  available for reading but not writing.
+
+  [writeonly]
+
+  Paths matching the specifiers following a writeonly section heading will be
+  available for writing but not reading.
+
+  [readwrite]
+
+  Paths matching the specifiers following a readwrite section heading will be
+  available for both writing and reading.
+
+  [override]
+
+  An override section provides a means to create holes in the FileService's
+  security architecture.  By default, the access specification in the config
+  file is augmented with 
+
+    [noaccess]
+    + ~/.*
+
+  since a lot of utilities store configuration information in directories
+  named '.*' in the users home directory.  Many of these store sensitive
+  information that could be used to upgrade permissions.  To make it easy
+  to keep this hidden, by default FileService provides no access. It may,
+  however, be useful on a carefully considered basis to provide access to 
+  some items in the .* directories. Specifiers following an override section
+  header are interpreted as if they were children of the single specifier
+  in the default [noaccess] section.  
+
+  Example:
+
+    [readonly]
+    + ~
+
+    [override]
+    + ~/.jsscs/config/file
+
+  This file is actually interpreted as
+
+    [readonly]
+    + ~
+
+    [noaccess]
+    + ~/.*
+    - ~/.jsscs/config/file
+
+  Multiple [override] sections are appended in the order they appear.
 
  ******************************************************************************/
 
 
 #include <map>
+#include <errno.h>
 
 #include <boost/assign.hpp>
 #include <boost/algorithm/string.hpp>
@@ -28,13 +119,19 @@
 #define BUFFER_SIZE 4096
 
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::FileService
+
+ *-----------------------------------------------------------------------------*/
+
 FileService::FileService(SecureConnectionPtr connection,
 			 const std::string& scheme,
 			 const std::string& configText)
   : Service(connection, scheme, configText),
     m_sftp(NULL),
-    m_home(""),
-    m_disabled(true)
+    m_home("")
 {
   registerMethod("get", make_method(this, &FileService::get));
   registerEvent("onresult");
@@ -42,10 +139,25 @@ FileService::FileService(SecureConnectionPtr connection,
 }
 
 
+/*-----------------------------------------------------------------------------*
+
+  FileService::~FileService
+
+ *-----------------------------------------------------------------------------*/
+
 FileService::~FileService()
 {
   revoke();
 }
+
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::start
+
+  TODO -- refactor command execution out to its own method.
+
+ *-----------------------------------------------------------------------------*/
 
 void FileService::start()
 {
@@ -96,8 +208,18 @@ void FileService::start()
 }
 
 
+/*-----------------------------------------------------------------------------*
+
+  FileService::revoke
+
+  Shut down the service.
+
+ *-----------------------------------------------------------------------------*/
+
 void FileService::revoke()
 {
+  m_enabled = false;
+
   if (m_sftp)
   {
     libssh2_sftp_shutdown(m_sftp);
@@ -105,6 +227,12 @@ void FileService::revoke()
   }
 }
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::create
+
+ *-----------------------------------------------------------------------------*/
 
 FileServicePtr FileService::create(SecureConnectionPtr connection,
 				   const std::string& scheme,
@@ -115,41 +243,109 @@ FileServicePtr FileService::create(SecureConnectionPtr connection,
   return fs;
 }
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::reportError
+
+ *-----------------------------------------------------------------------------*/
+
+void FileService::reportError(const FB::script_error& e) 
+{
+  FireEvent("onerror", FB::variant_list_of(shared_from_this())(e.what()));
+}
+
+
+/*-----------------------------------------------------------------------------*
+  
+  FileService::re_glob_transform
+
+  This is used to translate the full path indicated by a config specifier into
+  a regular expression that matches what it globs to. Sequentially, perform
+  the following conversion:
+
+    escape special characters .[{}()\+|^$, but not *?{} ...
+    ? --> .
+    * --> (\\\\.|[^\\/])*
+    {a,b,...} --> (a|b|...)
+    ... --> .*
+    remove trailing /
+ 
+  Processing braced alternatives is easier if the three syntactic parts --
+  '{', ',', and '}'. Hence we iteratively apply a regular expression to select
+  the next piece by required transformation:
+
+    ... --> .* ==> (\.{3})
+    one of .[{}()\+|^$ --> \_ ==> ([][{}()\+|^$])
+    ? --> . ==> (\?)
+    * --> (\.|[^\/])* ==> (\*)
+    { --> ( ==> (\{)
+    , --> | ==> (,)
+    } --> ) ==> (\})
+
+ *-----------------------------------------------------------------------------*/
+
+boost::regex FileService::re_glob_transform("(\\.{3})"
+					    "|([].[{}()\\+|^$])"
+					    "|(\\?)"
+					    "|(\\*)"
+					    "|(\\{)"
+					    "|(,)"
+					    "|(\\})"
+					    "|(.)");
+
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::parseConfig
+
+  SecureConnection supplies a service its configuration file contents at
+  construction.  This function parses that text and sets options appropriately
+  in the FileService instance.
+
+  It is written from the perspective that the remote host is POSIX-based. For
+  Windows-based hosts, the syntax of the configuration file's path specifiers
+  will have to be slightly different due to the use of backslash as a path
+  separator rather than a character escape.
+
+ *-----------------------------------------------------------------------------*/
+
 void FileService::parseConfig() 
 {
   // Yet another hand-coded parser.
 
   std::vector<std::string> lines;
   boost::split(lines, m_configText, boost::is_any_of("\n"));
+
+  // Default policy is to deny access to anything named .* in the users home
+  // directory, as these files typically contain sensitive configuration
+  // information (such as the keys in .ssh).  This is accomplished by implicitly
+  // appending two lines to every config.  This behavior can be modified through
+  // the use of [override] sections.
+  lines.push_back("[noaccess]");
+  lines.push_back("+~/.*");
   
   int count = lines.size();
   std::stringstream msg("FileService configuration error at line ");
 
   // Used to track the number of leading whitespace characters in specifier
   // lines.  Indentation is limited to no more than 1 greater than in the
-  // prior line.  
+  // prior line.
   int column = 0;
 
-  // Used to determine if a specifier line is nugatory, i.e. has the
-  // same polarity as its parent and therefore adding no information.
-  // Parity is computed as the sum of the column (0-based) of the
-  // first non-space character (the + or -) and 1, if that character
-  // is a +, or simply the column, if that character is a -, modulo 2.
-  // This variable is set such that computed parity + parity (the
-  // variable) is zero or not according to whether the specifier is
-  // worthwhile or not.  Thus if column 0 has a plus, it is most
-  // certainly useful, hence parity must be chosen so that (1 + 0) % 2
-  // + parity = 0 (% 2).  Clearly parity must be 1.  It follows
-  // therefore + charaters in even columns will be deemed useful, and
-  // - characters in odd.  
-  int parity = 0;
-
-  // This is used to make sure that we've seen a section config line
-  // before a specifier line.
+  // This is used to make sure that we've seen a section config line before a
+  // specifier line.
   int section = false;
 
   SecureConnectionPtr connection = m_connection.lock();
-  std::vector<std::string> parent_paths;
+
+  // Used to determine the full path of each specifier
+  std::vector<boost::filesystem::path> parent_paths;
+
+  // Used to hold the ConfigLine instances during processing.  Later they will
+  // be moved to final_config and overrides, and ultimately into the m_config
+  // member.
+  std::vector<ConfigLine> raw_config;
 
   for(int i = 0; i < count; i++)
   {
@@ -170,7 +366,7 @@ void FileService::parseConfig()
       {
 	if (!section)
 	{
-	  msg << i << ": the first non-blank line must be a section, not a specifier: \n";
+	  msg << i << ": the first non-blank line must be a section heading, not a specifier: \n";
 	  msg << line;
 	  connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
 	  return;
@@ -187,10 +383,19 @@ void FileService::parseConfig()
 	column = cl.getIndent();
 	parent_paths.resize(column+1);
 
+	boost::filesystem::path p(cl.getPath());
+	std::string p_str(p.string());
+	boost::filesystem::path::iterator p_it = p.begin();
+
 	if (column > 0)
 	{
-	  char initial = cl.getPath()[0];
-	  if (initial == '~' || initial == '/')
+	  // boost::filesystem::path::is_absolute won't work here, since it is
+	  // configured for the local machine, not the remote one.  In the
+	  // case that the local machine is Windows and the remote POSIX,
+	  // /home/users/foobar would not be considered absolute.  The same
+	  // applies below for is_relative in a similar test just below.
+	  // Hence we have to resort to more primitive means.
+	  if (p_str[0] == '/' || p_str[0] == '~')
 	  {
 	    msg << i << ": child specifier must have a relative path: \n";
 	    msg << line;
@@ -198,28 +403,27 @@ void FileService::parseConfig()
 	    return;
 	  }
 
-	  std::string full_path(parent_paths[column-1]);
-	  if (full_path[full_path.length()-1] != '/')
-	    full_path.append("/");
-
-	  full_path.append(cl.getPath());
-	  cl.setPath(full_path);
+	  cl.setPath(boost::filesystem::path(parent_paths[column-1]) /= p);
 	}
 	else
 	{
-	  char initial = cl.getPath()[0];
-	  if (initial != '~' && initial != '/')
+	  // See the comment in the subsequent clause of "if (column > 0)" above.
+	  if (p_str[0] != '/' && p_str[0] != '~')
 	  {
+	    // Would it be more civil to presume top-level relative paths
+	    // imply the home directory as a base?
+
 	    msg << i << ": root specifier must have an absolute path: \n";
 	    msg << line;
 	    connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
 	    return;
 	  }
 
-	  if (initial == '~')
+	  std::string comp0;
+
+	  if (p_it != p.end() && (comp0 = *p_it)[0] == '~')
 	  {
-	    std::string full_path(cl.getPath());
-	    if (full_path.length() > 1 && full_path[1] != '/')
+	    if (comp0.length() > 1)
 	    {
 	      // ~username is not supported, only login user's home directory
 	      // TODO: consider what it would take to support ~username
@@ -235,25 +439,52 @@ void FileService::parseConfig()
 	      connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
 	      return;
 	    }
-	    full_path.erase(0, 1);
-	    full_path.insert(0, m_home);
+
+	    boost::filesystem::path full_path(m_home);
+	    for (p_it++; p_it != p.end(); p_it++)
+	      full_path /= *p_it;
+
 	    cl.setPath(full_path);
 	  }
-
-	  parity = cl.getSign() == ConfigLine::PLUS ? 1 : 0;
 	}
-	parent_paths[column] = cl.getPath();
+	p = parent_paths[column] = cl.getPath();
 	
-	// Even though this line is not really useful, we still need to have
-	// its path in the stack to ensure that its non-nugatory children
-	// will be correctly interpreted.  Hence the absolute path still needs
-	// to be computed and this test come afterwards.
-	if (((cl.getSign() == ConfigLine::PLUS ? 1 : 0) + column + parity) % 2)
-	  continue;
+	// Normalize path to remove occurrences of /./ and to collapse
+	// occurrences of /../ 
 
-	// Transform globbed path into a regular expression that matches what
-	// the original path globs to.
-	std::string glob_path = cl.getPath();
+	p_it = p.begin();
+	boost::filesystem::path::iterator p_end = p.end();
+	std::vector<boost::filesystem::path> prefixes;
+
+	while (p_it != p_end)
+	{
+	  std::string comp(*p_it++);
+	  if (comp.compare(".") == 0)
+	    continue;
+
+	  if (comp.compare("..") == 0)
+	  {
+	    // Ensure that root never gets popped.
+	    if (prefixes.size() < 2)
+	    {
+	      msg << i << ": badly formed path, cannot resolve parent of root (/..): \n";
+	      msg << line;
+	      connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
+	      return;
+	    }
+	    prefixes.pop_back();
+	  }
+	  else
+	    prefixes.push_back(boost::filesystem::path((prefixes.size() == 0) 
+						       ? "" 
+						       : prefixes.back()) /= comp);
+	}
+
+	cl.setPath(prefixes.back());
+
+	// Transform (possibly globbed) path into a regular expression that
+	// matches the path (or what the path globs to).
+	std::string glob_path = cl.getPath().string();
 	boost::sregex_iterator it(glob_path.begin(), glob_path.end(), re_glob_transform);
 	boost::sregex_iterator end;
 	bool within_brace = false;
@@ -261,6 +492,8 @@ void FileService::parseConfig()
 	for(; it != end; it++)
 	{
 	  boost::match_results<std::string::const_iterator> what(*it);
+	  const char* t = re_text.str().c_str();
+	  const char* u = what.str().c_str();
 	  if (what[1].matched) // ... --> .*
 	    re_text << ".*";
 
@@ -278,28 +511,43 @@ void FileService::parseConfig()
 	    re_text << "(";
 	    within_brace = true;
 	  }
-	  else if (what[5].matched) // , --> , or | -- depending on ?within brace?
+	  else if (what[6].matched) // , --> , or | -- depending on ?within brace?
 	    re_text << (within_brace ? "|" : ",");
 
-	  else if (what[6].matched) // } --> )
+	  else if (what[7].matched) // } --> )
 	  {
 	    re_text << ")";
 	    within_brace = false;
 	  }
-	  else if (what[7].matched) // ordinary character --> itself
-	    re_text << what[7].str();
+	  else if (what[8].matched) // ordinary character --> itself
+	    re_text << what[8].str();
 	}
       
 	if (within_brace)
 	{
-	  // open brace in glob 
+	  // There is an unclosed brace in the path.
 	  msg << i << ": unterminated {, or nested {}s, in glob: \n";
 	  msg << line;
 	  connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
 	  return;
 	}
 
-	cl.setGlobRegex(boost::regex(re_text.str()));
+	// The processing above to remove . and .. should also ensure that the
+	// path does not end in a trailing /.
+	std::string regex_str = re_text.str();
+	if (regex_str[regex_str.length()-1] == '/')
+	{
+	  msg << i << ": internal error, no terminal slash assumption failed: \n";
+	  msg << line;
+	  connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
+	  return;
+	}
+
+	// Append (/.*)?$ so that directories will match.  This also prevents
+	// ~/foo from matching ~/foobar.
+	const char *s = re_text.str().c_str();
+	s = re_text.str().append("(/.*)?$").c_str();
+	cl.setGlobRegex(boost::regex(re_text.str().append("(/.*)?$")));
 	break;
       }
     case ConfigLine::SECTION_ERROR:
@@ -322,17 +570,63 @@ void FileService::parseConfig()
 
 	msg << line;
 	connection->FireEvent("onerror", FB::variant_list_of(connection)(this)(msg.str()));
-	m_disabled = true;
 	return;
       }
     }
 
-    m_config.push_back(cl);
+    raw_config.push_back(cl);
   }
+
+  // Look through the config lines for specifiers after an override section
+  // header.  At this point, there will only be SECTION and SPECIFIER lines.
+  // Keep the non-override section headers and the specifiers that follow them
+  // in final_config; keep the override specifiers in overrides, while changing
+  // their signs as they are stored.  At the end the overrides are appended so
+  // that they'll make holes in the default security policy of not allowing
+  // access to files at or below ~/.*.
+
+  std::vector<ConfigLine> final_config;
+  std::vector<ConfigLine> overrides;
+  
+  std::vector<ConfigLine>::iterator o_it = raw_config.begin();
+  bool in_override = false;
+  while (o_it != raw_config.end())
+  {
+    ConfigLine& cl = *o_it++;
+    if (cl.getType() == ConfigLine::SECTION)
+      in_override = cl.getSection() == ConfigLine::OVERRIDE;
+
+    if (in_override && cl.getType() == ConfigLine::SPECIFIER)
+    {
+      cl.setSign(!cl.getSign());
+      overrides.push_back(cl);
+    }
+
+    if (!in_override)
+      final_config.push_back(cl);
+  }
+
+  // Final config should end with "[noaccess]" and "+~/.*".  The overrides go
+  // right after.  In the loop above, they had their signs changed so that
+  // a positive statement (override this path) creates a hole in the noaccess
+  // section.
+
+  final_config.insert(final_config.end(), overrides.begin(), overrides.end());
+
+  m_config = final_config;
+  m_enabled = true;
 }
 
 
-// These need to be in the same order as the ConfigSection enum
+/*-----------------------------------------------------------------------------*
+  
+  FileService::ConfigLine::SectionNames
+
+  This map is used to translate the text in section headings with internal 
+  constants representing the different section types.
+
+ *-----------------------------------------------------------------------------*/
+
 std::map<std::string,
 	 FileService::ConfigLine::ConfigSection,
 	 std::greater<std::string> > FileService::ConfigLine::SectionNames =
@@ -343,34 +637,42 @@ std::map<std::string,
 		 ("readwrite", FileService::ConfigLine::READWRITE)
 		 ("override", FileService::ConfigLine::OVERRIDE);
 
+
+/*-----------------------------------------------------------------------------*
+  
+  FileService::ConfigLine::re_blank
+  FileService::ConfigLine::re_section
+  FileService::ConfigLine::re_specifier
+
+  Regular expressions to recognize the different types of config lines.
+
+  TODO -- DRY: re_section should be derived from SectionNames above.
+
+ *-----------------------------------------------------------------------------*/
+
 boost::regex FileService::ConfigLine::re_blank("^\\s*$");
 boost::regex FileService::ConfigLine::re_section("^\\[\\s*(noaccess|readonly|writeonly|readwrite|override)\\s*\\]\\s*$", boost::regex::icase);
-//boost::regex FileService::ConfigLine::re_specifier("^(\\s*)(\\+|-)\\s*((~?/)?(([^/\\]|(\\\\)|(\\/))*)(/([^/\\]|(\\\\)|(\\/))*)*)\\s*$");
 boost::regex FileService::ConfigLine::re_specifier("^(\\s*)(\\+|-)\\s*(.*[^ ])\\s*$");
-    // Used to give more helpful error messages
+
+
+// Used to give a more helpful error message for errors in section headers.
+
 boost::regex FileService::ConfigLine::re_crude_section("^\\[");
-boost::regex FileService::ConfigLine::re_crude_specifier("^\\s*(\\+|-)");
 
-// This is used to translate the full path indicated by a config
-// specifier into a regular expression that matches what it globs
-// to. Sequentially, perform the following conversion:
-//   escape special characters .[{}()\+|^$, but not *?{} ...
-//   ? --> .
-//   * --> (\\\\.|[^\\/])*
-//   {a,b,...} --> (a|b|...)
-//   ... --> .*
-//   remove trailing /
-// 
-// Iteratively apply a regular expression to select the next piece by 
-// required transformation:
-//   ... --> .* ==> (\\.{3})
-//   one of .[{}()\+|^$ --> \_ ==> ([][{}()\\+|^$])
-//   ? --> , ==> (\\?)
-//   * --> (\\\\.|[^\\/])* ==> (\\*)
-//   {a,b,...} --> (a|b|...) ==> (\\{(?:\\\\.|[^\\{])*\\}) == (\{(?:\\.|[^\{])*\})
 
-boost::regex FileService::re_glob_transform("(\\.{3})|([].[{}()\\+|^$])|(\\?)|(\\*)|(\\{)|(,)|(\\})|(.)");
+/*-----------------------------------------------------------------------------*
+  
+  FileService::ConfigLine::ConfigLine
 
+  FileService's configuration file is line-based. Each line will have one of
+  three valid types, or one of three error types. Valid lines can be blank,
+  can initiate a new section, or can specify a subtree to be included or
+  excluded from the current section. There is an error type for each non-blank
+  line and one for catch-all errors. Currently, the SPECIFIER_ERROR type is
+  unreachable, as errors in specifiers are caught in FileService::parseConfig,
+  not here.
+
+ *-----------------------------------------------------------------------------*/
 
 FileService::ConfigLine::ConfigLine(const std::string& line)
 {
@@ -396,43 +698,173 @@ FileService::ConfigLine::ConfigLine(const std::string& line)
     m_type = SPECIFIER;
 
     m_specifier.indent = what[1].str().length();
-    m_specifier.sign = (what[2].str().compare("+") == 0) ? PLUS : MINUS;
+    m_specifier.sign = (what[2].str().compare("+") == 0) ? 1 : 0;
 
-    m_specifier.path = what[3].str();
+    m_specifier.path = boost::filesystem::path(what[3].str());
   }
   else if (boost::regex_match(line, what, re_crude_section))
+    // found something bracketed, but not recognizable as a section
     m_type = SECTION_ERROR;
-
-  else if (boost::regex_match(line, what, re_crude_specifier))
-    m_type = SPECIFIER_ERROR;
 
   else
     m_type = MISC_ERROR;
 }
 
 
-void FileService::reportError(const FB::script_error& e) 
+/*-----------------------------------------------------------------------------*
+
+  FileService::isReadable
+
+  Checks to see if the path can be read.
+
+ *-----------------------------------------------------------------------------*/
+
+bool FileService::isReadable(const std::string& path)
 {
-  FireEvent("onerror", FB::variant_list_of(shared_from_this())(e.what()));
+  return getPermissions(path).first;
 }
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::isWriteable
+
+  Checks to see if the path can be written.
+
+ *-----------------------------------------------------------------------------*/
+
+bool FileService::isWriteable(const std::string& path)
+{
+  return getPermissions(path).second;
+}
+
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::getPermissions
+
+  Checks the given path against the config permissions.
+
+  parseConfig set up m_config so that all this function need do is evaluate
+  each ConfigLine in turn, testing whether or not the contained regex matches
+  the given path. If it does, then the appropriate permissions for that
+  section are recorded; if not no action is taken. The last result wins. By
+  default, all permissions are assumed to be refused, so only positive action
+  on the part of the user who edited the config file can allow a file to be
+  accessed.
+
+  The pair returned has read permission first, write second.
+
+ *-----------------------------------------------------------------------------*/
+
+std::pair<bool, bool> FileService::getPermissions(const std::string& path)
+{
+  std::vector<ConfigLine>::iterator it;
+  boost::smatch match; 
+
+  // parseConfig requires that a section be prior to all specifiers, so that
+  // this is guaranteed to be initialized before a specifier is processed
+  // below.
+  FileService::ConfigLine::ConfigSection section;
+
+  bool canRead = false;
+  bool canWrite = false;
+
+  for (it = m_config.begin(); it != m_config.end(); it++)
+  {
+    const char *s = (it->getType() == ConfigLine::SPECIFIER) ? it->getGlobRegex().str().c_str() : "";
+    if (it->getType() == ConfigLine::SECTION)
+      section = it->getSection();
+
+    else if (boost::regex_match(path, match, it->getGlobRegex()))
+    {
+      switch (section)
+      {
+      case ConfigLine::NOACCESS:
+	canRead = false;
+	canWrite = false;
+	break;
+
+      case ConfigLine::READWRITE:
+	canRead = true;
+	canWrite = true;
+	break;
+
+      case ConfigLine::READONLY:
+	canRead = true;
+	canWrite = false;
+	break;
+
+      case ConfigLine::WRITEONLY:
+	canRead = false;
+	canWrite = true;
+	break;
+
+      default:
+	// This shouldn't happen; errors and overrides should have been
+	// filtered out by now.
+	break;
+      } 
+    }
+  }
+  return std::pair<bool, bool>(canRead, canWrite);
+}
+
+
+/*-----------------------------------------------------------------------------*
+
+  FileService::get
+
+  Get returns a command instance to fetch a file from the remote host.
+
+ *-----------------------------------------------------------------------------*/
 
 FB::JSAPIPtr FileService::get(const std::string& path)
 {
-  return boost::make_shared<FileServiceGetCommand>(FB::ptr_cast<FileService>(shared_from_this()), path);
+  bool enabled = true;
+
+  if (!m_enabled)
+  {
+    reportError(FB::script_error("Service is disabled."));
+    enabled = false;
+  }
+  else if (!isReadable(path))
+  {
+    reportError(FB::script_error("Permission denied."));
+    enabled = false;
+  }
+
+  return boost::make_shared<FileServiceGetCommand>(FB::ptr_cast<FileService>(shared_from_this()), path, enabled);
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
 
-FileServiceGetCommand::FileServiceGetCommand(const FileServicePtr& service, const std::string& path)
+
+/*-----------------------------------------------------------------------------*
+
+  FileServiceGetCommand::FileServiceGetCommand
+
+ *-----------------------------------------------------------------------------*/
+
+FileServiceGetCommand::FileServiceGetCommand(const FileServicePtr& service,
+					     const std::string& path,
+					     bool enabled)
   : m_service(service),
-    m_path(path)
+    m_path(path),
+    m_enabled(enabled)
 {
   registerMethod("exec", make_method(this, &FileServiceGetCommand::exec));
   registerEvent("onresult");
   registerEvent("onerror");
 }
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileServiceGetCommand::report
+
+ *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::report(const std::string& event, FB::VariantList args)
 {
@@ -442,11 +874,23 @@ void FileServiceGetCommand::report(const std::string& event, FB::VariantList arg
 }
 
 
+/*-----------------------------------------------------------------------------*
+
+  FileServiceGetCommand::reportResult
+
+ *-----------------------------------------------------------------------------*/
+
 void FileServiceGetCommand::reportResult(FB::VariantList args)
 {
   report("onresult", args);
 }
 
+
+/*-----------------------------------------------------------------------------*
+
+  FileServiceGetCommand::reportError
+
+ *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::reportError(const FB::script_error& e) 
 {
@@ -455,9 +899,19 @@ void FileServiceGetCommand::reportError(const FB::script_error& e)
 
 
 
+/*-----------------------------------------------------------------------------*
+
+  FileServiceGetCommand::exec
+
+  This is the meat of the get command, boilerplate sftp file fetch.
+
+ *-----------------------------------------------------------------------------*/
+
 void FileServiceGetCommand::exec(const FB::JSObjectPtr& callback)
 {
-  FBLOG_INFO("FileServiceGetCommand::exec", m_path);
+  if (!m_enabled)
+    return;
+
   LIBSSH2_SFTP_HANDLE *file = NULL;
   
   try
@@ -466,7 +920,8 @@ void FileServiceGetCommand::exec(const FB::JSObjectPtr& callback)
 				   m_path.c_str(), LIBSSH2_FXF_READ, 0)))
       throw FB::script_error("File not found.");
 
-    //for now, presume contents are ascii.
+    // For now, presume contents are ascii.
+    // TODO -- encoding
     std::stringstream contents;
 
     int rc;
@@ -478,8 +933,7 @@ void FileServiceGetCommand::exec(const FB::JSObjectPtr& callback)
     }
 
     if (rc < 0) 
-      // TODO -- get error msg for errno
-      throw FB::script_error("Error while reading file.");
+      throw FB::script_error(std::string("Error while reading file: ").append(strerror(errno)));
 
     libssh2_sftp_close(file);
     file = NULL;

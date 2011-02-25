@@ -281,3 +281,34 @@ Security:
 1. Enforce same origin policy by default; allow exceptions. [client]
 2. Require password entry by default; allow use of stored keys. [client]
 3. Grant all services by default; allow refuse all, exceptions. [remote]
+
+
+Drawing a Plugin In Unix
+
+https://developer.mozilla.org/en/Gecko_Plugin_API_Reference/Drawing_and_Event_Handling
+
+Unix
+
+On Unix, the browser creates a Motif Drawing Area widget for the
+instance and passes the window ID of the widget in the window field of
+NPWindow. Additionally, the browser creates an
+NPSetWindowCallbackStruct object and passes it in the ws_info field of
+NPWindow. As on Windows, the plug-in can receive all events for the
+instance, in this case through the widget. If the plug-in needs to
+receive periodic time messages, it should install a timer or fork a
+thread.
+
+...
+
+Unix/X11
+
+The plug-in receives a GraphicsExpose event. The XGraphicsExposeEvent
+structure contains the Xlib Drawable (which is an offscreen Pixmap),
+its Display, and the dirty rectangle (optional clip rectangle)
+specified relative to the top-left corner of the drawable.
+
+The plugin should draw to the Drawable with the offset specified in
+the x and y members of the NPWindow structure, with the clip rectangle
+specified in the clipRect member, and with the Visual and Colormap
+specified in the ws_info member.
+

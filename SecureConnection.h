@@ -1,8 +1,36 @@
-/**********************************************************\
+/******************************************************************************
 
   SecureConnection.h
 
-\**********************************************************/
+  SecureConnection wraps an SSL connection with a remote host. It reads the
+  configuration information below ~/.jsscs/config on the remote host and
+  offers only those services which are configured. It checks that the url of
+  the foreign host is allowed by the same origin policy. It ensures that
+  SSL sessions are closed and freed when this object is reclaimed.
+
+  ---------------------------------------------------------------------------
+
+  This file is part of JS/SCS.
+
+  JS/SCS is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+
+  ---------------------------------------------------------------------------
+
+  Copyright 2011 Pat M. Lasswell.
+
+ ******************************************************************************/
+
 
 #include <string>
 
@@ -93,6 +121,8 @@ class SecureConnection : public FB::JSAPIAuto
   void grantService(ServicePtr service);
   void revokeAllServices();
 
+  //  void requestCredentials();
+
   //  void checkKnownHost(boost::optional<const FB::JSObjectPtr&> callbackAdviseUnknownHost);
 
  private:
@@ -121,3 +151,8 @@ class SecureConnection : public FB::JSAPIAuto
 
 #endif // H_SecureConnection
 
+// Local Variables:
+// mode: c++
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// End:

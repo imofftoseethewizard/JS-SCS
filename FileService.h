@@ -2,6 +2,31 @@
 
   FileService.h
 
+  
+  ---------------------------------------------------------------------------
+
+  This file is part of JS/SCS.
+
+  JS/SCS is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+
+  ---------------------------------------------------------------------------
+
+  Copyright 2011 Pat M. Lasswell.
+
+
+  ---------------------------------------------------------------------------
+*//*
   FileService exposes much of the functionality of sftp.
 
   var fs;
@@ -161,110 +186,117 @@ A line matches a section if the last matching specifier starts with a '+'.
 
 FB_FORWARD_PTR(FileService)
 
-class FileServiceGetCommand : public FB::JSAPIAuto
-{
-public:
+  class FileServiceGetCommand : public FB::JSAPIAuto
+  {
+  public:
     FileServiceGetCommand(const FileServicePtr& service,
 			  const std::string& path,
 			  bool enabled = true);
     void exec(const FB::JSObjectPtr& callback);
 
-protected:
+  protected:
     void report(const std::string& event, FB::VariantList args);
     void reportResult(FB::VariantList args);
     void reportError(const FB::script_error& e) ;
 
-private:
+  private:
     FileServicePtr m_service;
     std::string m_path;
     bool m_enabled;
-};
+  };
 
 
 class FileService : public Service
 {
-    friend class FileServiceGetCommand;
+  friend class FileServiceGetCommand;
 
 public:
-    FileService(SecureConnectionPtr connection,
-		const std::string& scheme,
-		const std::string& config);
+  FileService(SecureConnectionPtr connection,
+              const std::string& scheme,
+              const std::string& config);
 
-    virtual ~FileService();
+  virtual ~FileService();
 
-    virtual void start();
-    virtual void revoke();
+  virtual void start();
+  virtual void revoke();
 
-    static boost::shared_ptr<FileService> create(SecureConnectionPtr connection,
-						 const std::string& scheme,
-						 const std::string& config);
+  static boost::shared_ptr<FileService> create(SecureConnectionPtr connection,
+                                               const std::string& scheme,
+                                               const std::string& config);
 
-    FB::JSAPIPtr get(const std::string &path);
+  FB::JSAPIPtr get(const std::string &path);
 
 
 protected:
-    void parseConfig();
+  void parseConfig();
 
-    bool isReadable(const std::string& path);
-    bool isWriteable(const std::string& path);
-    std::pair<bool, bool> getPermissions(const std::string& path);
+  bool isReadable(const std::string& path);
+  bool isWriteable(const std::string& path);
+  std::pair<bool, bool> getPermissions(const std::string& path);
 
-    class ConfigLine
-    {
-    public:
-	ConfigLine(const std::string& line);
+  class ConfigLine
+  {
+  public:
+    ConfigLine(const std::string& line);
 	
-	typedef enum { BLANK, SECTION, SPECIFIER, SECTION_ERROR, SPECIFIER_ERROR, MISC_ERROR } Type;
-	typedef enum { NOACCESS, READONLY, WRITEONLY, READWRITE, OVERRIDE } ConfigSection;
-	static std::map<std::string, ConfigSection, std::greater<std::string> > SectionNames;
+    typedef enum { BLANK, SECTION, SPECIFIER, SECTION_ERROR, SPECIFIER_ERROR, MISC_ERROR } Type;
+    typedef enum { NOACCESS, READONLY, WRITEONLY, READWRITE, OVERRIDE } ConfigSection;
+    static std::map<std::string, ConfigSection, std::greater<std::string> > SectionNames;
 
-	typedef struct
-	{
-	    int sign;
-	    int indent;
-	    boost::filesystem::path path;
-	    boost::regex re_glob;
-	} Specifier;
+    typedef struct
+    {
+      int sign;
+      int indent;
+      boost::filesystem::path path;
+      boost::regex re_glob;
+    } Specifier;
 
-	typedef boost::shared_ptr<ConfigLine> Ptr;
-	typedef boost::weak_ptr<ConfigLine> WeakPtr;
+    typedef boost::shared_ptr<ConfigLine> Ptr;
+    typedef boost::weak_ptr<ConfigLine> WeakPtr;
 
-	inline ConfigSection getSection() { return m_section; };
-	inline Type getType() { return m_type; };
-	inline int getSign() { return m_specifier.sign; };
-	inline void setSign(int sign) { m_specifier.sign = sign; };
-	inline int getIndent() { return m_specifier.indent; };
+    inline ConfigSection getSection() { return m_section; };
+    inline Type getType() { return m_type; };
+    inline int getSign() { return m_specifier.sign; };
+    inline void setSign(int sign) { m_specifier.sign = sign; };
+    inline int getIndent() { return m_specifier.indent; };
 
-	inline boost::filesystem::path getPath() { return m_specifier.path; };
-	inline void setPath(const std::string &path) { m_specifier.path = path; };
-	inline void setPath(const boost::filesystem::path &path) { m_specifier.path = path; };
-	inline boost::regex getGlobRegex() { return m_specifier.re_glob; };
-	inline void setGlobRegex(const boost::regex& re_glob) { m_specifier.re_glob = re_glob; };
+    inline boost::filesystem::path getPath() { return m_specifier.path; };
+    inline void setPath(const std::string &path) { m_specifier.path = path; };
+    inline void setPath(const boost::filesystem::path &path) { m_specifier.path = path; };
+    inline boost::regex getGlobRegex() { return m_specifier.re_glob; };
+    inline void setGlobRegex(const boost::regex& re_glob) { m_specifier.re_glob = re_glob; };
 
-    protected:
-	static boost::regex re_blank;
-	static boost::regex re_section;
-	static boost::regex re_specifier;
+  protected:
+    static boost::regex re_blank;
+    static boost::regex re_section;
+    static boost::regex re_specifier;
 
-	// Used to give more helpful error messages
-	static boost::regex re_crude_section;
+    // Used to give more helpful error messages
+    static boost::regex re_crude_section;
 
-    private:
-	Type m_type;
-	ConfigSection m_section;
-	Specifier m_specifier;
-    };
+  private:
+    Type m_type;
+    ConfigSection m_section;
+    Specifier m_specifier;
+  };
     
-    static boost::regex re_glob_transform;
+  static boost::regex re_glob_transform;
 
-    void reportError(const FB::script_error& e);
+  void reportError(const FB::script_error& e);
 
 private:
-    LIBSSH2_SFTP *m_sftp; // channel for file transfer
-    std::string m_home; // connection's user's home directory on remote host.
+  LIBSSH2_SFTP *m_sftp; // channel for file transfer
+  std::string m_home; // connection's user's home directory on remote host.
 
-    bool m_enabled;
-    std::vector<ConfigLine> m_config;
+  bool m_enabled;
+  std::vector<ConfigLine> m_config;
 };
 
 #endif // H_FileService
+
+
+// Local Variables:
+// mode: c++
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// End:

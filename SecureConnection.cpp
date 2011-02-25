@@ -1,8 +1,36 @@
-/**********************************************************\
+/******************************************************************************
 
   SecureConnection.cpp
 
-\**********************************************************/
+  SecureConnection wraps an SSL connection with a remote host. It reads the
+  configuration information below ~/.jsscs/config on the remote host and
+  offers only those services which are configured. It checks that the url of
+  the foreign host is allowed by the same origin policy. It ensures that
+  SSL sessions are closed and freed when this object is reclaimed.
+
+  ---------------------------------------------------------------------------
+
+  This file is part of JS/SCS.
+
+  JS/SCS is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+
+  ---------------------------------------------------------------------------
+
+  Copyright 2011 Pat M. Lasswell.
+
+ ******************************************************************************/
+
 
 #define DIR_BUFFER_SIZE 1024
 #define FILE_BUFFER_SIZE 4096
@@ -15,6 +43,10 @@
 #include <libssh2_sftp.h>
 
 #include <sys/stat.h>
+
+#if FB_X11
+#include <gtk/gtk.h>
+#endif
 
 /*
 #ifdef HAVE_WINSOCK2_H
@@ -264,6 +296,7 @@ void SecureConnection::openAsync()
 
 void SecureConnection::open()
 {
+  requestCredentials();
   if (m_readyState != NEW && m_readyState != CLOSED) 
     reportError(FB::script_error("SecureConnection is already open."));
 
@@ -648,3 +681,39 @@ void SecureConnection::getServiceSchemes()
     throw e;
   }
 }
+
+
+#if 0
+void SecureConnection::requestCredentials()
+{
+  GtkWidget *dialog, *label, *content_area;
+
+  /* Create the widgets */
+  dialog = gtk_dialog_new_with_buttons ("Message",
+					->getBrowserWindow(),
+					GTK_DIALOG_DESTROY_WITH_PARENT|GTK_DIALOG_MODAL,
+					GTK_STOCK_OK,
+					GTK_RESPONSE_NONE,
+					NULL);
+  content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+  label = gtk_label_new ("Hello, World!");
+
+  /* Ensure that the dialog box is destroyed when the user responds */
+  g_signal_connect_swapped (dialog,
+			    "response",
+			    G_CALLBACK (gtk_widget_destroy),
+			    dialog);
+
+  /* Add the label, and show everything we've added to the dialog */
+
+  gtk_container_add (GTK_CONTAINER (content_area), label);
+  gtk_widget_show_all (dialog);
+}
+#endif
+
+
+// Local Variables:
+// mode: c++
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// End:

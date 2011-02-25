@@ -2,6 +2,33 @@
 
   FileService.cpp
 
+  ---------------------------------------------------------------------------
+
+  This file is part of JS/SCS.
+
+  JS/SCS is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+
+  ---------------------------------------------------------------------------
+
+  Copyright 2011 Pat M. Lasswell.
+
+ ******************************************************************************/
+
+/******************************************************************************
+
+  FileService.cpp
+
   Config File
 
   The config file for FileService is located at .jsscs/config/file.
@@ -113,7 +140,6 @@
 #include "variant_list.h"
 
 #include "FileService.h"
-#include "AsyncCommand.h"
 
 // Used by get, command execution
 #define BUFFER_SIZE 4096
@@ -124,7 +150,7 @@
 
   FileService::FileService
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FileService::FileService(SecureConnectionPtr connection,
 			 const std::string& scheme,
@@ -143,7 +169,7 @@ FileService::FileService(SecureConnectionPtr connection,
 
   FileService::~FileService
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FileService::~FileService()
 {
@@ -157,7 +183,7 @@ FileService::~FileService()
 
   TODO -- refactor command execution out to its own method.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileService::start()
 {
@@ -214,7 +240,7 @@ void FileService::start()
 
   Shut down the service.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileService::revoke()
 {
@@ -232,7 +258,7 @@ void FileService::revoke()
 
   FileService::create
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FileServicePtr FileService::create(SecureConnectionPtr connection,
 				   const std::string& scheme,
@@ -248,7 +274,7 @@ FileServicePtr FileService::create(SecureConnectionPtr connection,
 
   FileService::reportError
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileService::reportError(const FB::script_error& e) 
 {
@@ -264,26 +290,26 @@ void FileService::reportError(const FB::script_error& e)
   a regular expression that matches what it globs to. Sequentially, perform
   the following conversion:
 
-    escape special characters .[{}()\+|^$, but not *?{} ...
-    ? --> .
-    * --> (\\\\.|[^\\/])*
-    {a,b,...} --> (a|b|...)
-    ... --> .*
-    remove trailing /
+  escape special characters .[{}()\+|^$, but not *?{} ...
+  ? --> .
+  * --> (\\\\.|[^\\/])*
+  {a,b,...} --> (a|b|...)
+  ... --> .*
+  remove trailing /
  
   Processing braced alternatives is easier if the three syntactic parts --
   '{', ',', and '}'. Hence we iteratively apply a regular expression to select
   the next piece by required transformation:
 
-    ... --> .* ==> (\.{3})
-    one of .[{}()\+|^$ --> \_ ==> ([][{}()\+|^$])
-    ? --> . ==> (\?)
-    * --> (\.|[^\/])* ==> (\*)
-    { --> ( ==> (\{)
-    , --> | ==> (,)
-    } --> ) ==> (\})
+  ... --> .* ==> (\.{3})
+  one of .[{}()\+|^$ --> \_ ==> ([][{}()\+|^$])
+  ? --> . ==> (\?)
+  * --> (\.|[^\/])* ==> (\*)
+  { --> ( ==> (\{)
+  , --> | ==> (,)
+  } --> ) ==> (\})
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 boost::regex FileService::re_glob_transform("(\\.{3})"
 					    "|([].[{}()\\+|^$])"
@@ -308,7 +334,7 @@ boost::regex FileService::re_glob_transform("(\\.{3})"
   will have to be slightly different due to the use of backslash as a path
   separator rather than a character escape.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileService::parseConfig() 
 {
@@ -625,7 +651,7 @@ void FileService::parseConfig()
   This map is used to translate the text in section headings with internal 
   constants representing the different section types.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 std::map<std::string,
 	 FileService::ConfigLine::ConfigSection,
@@ -648,7 +674,7 @@ std::map<std::string,
 
   TODO -- DRY: re_section should be derived from SectionNames above.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 boost::regex FileService::ConfigLine::re_blank("^\\s*$");
 boost::regex FileService::ConfigLine::re_section("^\\[\\s*(noaccess|readonly|writeonly|readwrite|override)\\s*\\]\\s*$", boost::regex::icase);
@@ -672,7 +698,7 @@ boost::regex FileService::ConfigLine::re_crude_section("^\\[");
   unreachable, as errors in specifiers are caught in FileService::parseConfig,
   not here.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FileService::ConfigLine::ConfigLine(const std::string& line)
 {
@@ -717,7 +743,7 @@ FileService::ConfigLine::ConfigLine(const std::string& line)
 
   Checks to see if the path can be read.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 bool FileService::isReadable(const std::string& path)
 {
@@ -731,7 +757,7 @@ bool FileService::isReadable(const std::string& path)
 
   Checks to see if the path can be written.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 bool FileService::isWriteable(const std::string& path)
 {
@@ -755,7 +781,7 @@ bool FileService::isWriteable(const std::string& path)
 
   The pair returned has read permission first, write second.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 std::pair<bool, bool> FileService::getPermissions(const std::string& path)
 {
@@ -817,7 +843,7 @@ std::pair<bool, bool> FileService::getPermissions(const std::string& path)
 
   Get returns a command instance to fetch a file from the remote host.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FB::JSAPIPtr FileService::get(const std::string& path)
 {
@@ -845,7 +871,7 @@ FB::JSAPIPtr FileService::get(const std::string& path)
 
   FileServiceGetCommand::FileServiceGetCommand
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 FileServiceGetCommand::FileServiceGetCommand(const FileServicePtr& service,
 					     const std::string& path,
@@ -864,7 +890,7 @@ FileServiceGetCommand::FileServiceGetCommand(const FileServicePtr& service,
 
   FileServiceGetCommand::report
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::report(const std::string& event, FB::VariantList args)
 {
@@ -878,7 +904,7 @@ void FileServiceGetCommand::report(const std::string& event, FB::VariantList arg
 
   FileServiceGetCommand::reportResult
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::reportResult(FB::VariantList args)
 {
@@ -890,7 +916,7 @@ void FileServiceGetCommand::reportResult(FB::VariantList args)
 
   FileServiceGetCommand::reportError
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::reportError(const FB::script_error& e) 
 {
@@ -905,7 +931,7 @@ void FileServiceGetCommand::reportError(const FB::script_error& e)
 
   This is the meat of the get command, boilerplate sftp file fetch.
 
- *-----------------------------------------------------------------------------*/
+  *-----------------------------------------------------------------------------*/
 
 void FileServiceGetCommand::exec(const FB::JSObjectPtr& callback)
 {
@@ -948,3 +974,10 @@ void FileServiceGetCommand::exec(const FB::JSObjectPtr& callback)
     reportError(e);
   }
 }
+
+
+// Local Variables:
+// mode: c++
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// End:

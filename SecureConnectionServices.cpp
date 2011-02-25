@@ -1,11 +1,35 @@
-/**********************************************************\
+/******************************************************************************
 
-  Auto-generated SecureConnectionServices.cpp
+  SecureConnectionServices.cpp
 
-\**********************************************************/
+  SecureConnectionServices is the root of the object heirarchy for the
+  Javascript API of the plugin. The properties and methods registered in the
+  instance constructor will appear on the object created by the <embed> tag in
+  the web page.
 
-#include <string>
-#include <sstream>
+  ----------------------------------------------------------------------------
+
+  This file is part of JS/SCS.
+
+  JS/SCS is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+
+  ----------------------------------------------------------------------------
+
+  Copyright 2011 Pat M. Lasswell.
+
+ ******************************************************************************/
+
 
 #include "JSObject.h"
 #include "variant_list.h"
@@ -13,6 +37,7 @@
 
 #include "SecureConnectionServices.h"
 #include "SecureConnection.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 /// @fn SecureConnectionServices::SecureConnectionServices(const SecureConnectionServicesPluginPtr& plugin, const FB::BrowserHostPtr host)
@@ -29,23 +54,8 @@ SecureConnectionServices::SecureConnectionServices(boost::shared_ptr<SecureConne
   : m_plugin(plugin),
     m_host(host)
 {
-    registerMethod("echo",      make_method(this, &SecureConnectionServices::echo));
-    registerMethod("testEvent", make_method(this, &SecureConnectionServices::testEvent));
     registerMethod("SecureConnection", make_method(this, &SecureConnectionServices::createSecureConnection));
-
-    // Read-write property
-    registerProperty("testString",
-                     make_property(this,
-                        &SecureConnectionServices::get_testString,
-                        &SecureConnectionServices::set_testString));
-
-    // Read-only property
-    registerProperty("version",
-                     make_property(this,
-                        &SecureConnectionServices::get_version));
-    
-    
-    registerEvent("onfired");    
+    registerProperty("version", make_property(this, &SecureConnectionServices::get_version));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,32 +88,13 @@ SecureConnectionServicesPluginPtr SecureConnectionServices::getPlugin()
 
 
 
-// Read/Write property testString
-std::string SecureConnectionServices::get_testString()
-{
-    return m_testString;
-}
-void SecureConnectionServices::set_testString(const std::string& val)
-{
-    m_testString = val;
-}
-
 // Read-only property version
 std::string SecureConnectionServices::get_version()
 {
     return "0.01.01";
 }
 
-// Method echo
-FB::variant SecureConnectionServices::echo(const FB::variant& msg)
-{
-    return msg;
-}
 
-void SecureConnectionServices::testEvent(const FB::variant& var)
-{
-    FireEvent("onfired", FB::variant_list_of(var)(true)(1));
-}
 
 // SecureConnection (JS)constructor 
 
@@ -115,3 +106,9 @@ SecureConnectionServices::createSecureConnection(const std::string& user,
   return boost::make_shared<SecureConnection>(FB::ptr_cast<SecureConnectionServices>(shared_from_this()),
 					      user, hostName, port.get_value_or(22));
 }
+
+// Local Variables:
+// mode: c++
+// c-basic-offset: 2
+// indent-tabs-mode: nil
+// End:

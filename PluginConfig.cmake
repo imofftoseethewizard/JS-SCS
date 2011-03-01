@@ -1,22 +1,22 @@
 #/**********************************************************\ 
 #
 # Auto-Generated Plugin Configuration file
-# for SecureConnectionServices
+# for HostServices
 #
 #\**********************************************************/
 
-set(PLUGIN_NAME "SecureConnectionServices")
-set(PLUGIN_PREFIX "SCS")
+set(PLUGIN_NAME "HostServices")
+set(PLUGIN_PREFIX "HS")
 set(COMPANY_NAME "Blackwhistle")
 
 # ActiveX constants:
-set(FBTYPELIB_NAME SecureConnectionServicesLib)
-set(FBTYPELIB_DESC "SecureConnectionServices 1.0 Type Library")
-set(IFBControl_DESC "SecureConnectionServices Control Interface")
-set(FBControl_DESC "SecureConnectionServices Control Class")
-set(IFBComJavascriptObject_DESC "SecureConnectionServices IComJavascriptObject Interface")
-set(FBComJavascriptObject_DESC "SecureConnectionServices ComJavascriptObject Class")
-set(IFBComEventSource_DESC "SecureConnectionServices IFBComEventSource Interface")
+set(FBTYPELIB_NAME HostServicesLib)
+set(FBTYPELIB_DESC "HostServices 1.0 Type Library")
+set(IFBControl_DESC "HostServices Control Interface")
+set(FBControl_DESC "HostServices Control Class")
+set(IFBComJavascriptObject_DESC "HostServices IComJavascriptObject Interface")
+set(FBComJavascriptObject_DESC "HostServices ComJavascriptObject Class")
+set(IFBComEventSource_DESC "HostServices IFBComEventSource Interface")
 set(AXVERSION_NUM "1")
 
 # NOTE: THESE GUIDS *MUST* BE UNIQUE TO YOUR PLUGIN/ACTIVEX CONTROL!  YES, ALL OF THEM!
@@ -28,8 +28,8 @@ set(FBComJavascriptObject_GUID 1f4c0342-cb8c-5e15-b756-d4d48114506a)
 set(IFBComEventSource_GUID ba91a968-35c4-5ad7-912b-c9e47481311f)
 
 # these are the pieces that are relevant to using it from Javascript
-set(ACTIVEX_PROGID "Blackwhistle.SecureConnectionServices")
-set(MOZILLA_PLUGINID "blackwhistle.com/SecureConnectionServices")
+set(ACTIVEX_PROGID "Blackwhistle.HostServices")
+set(MOZILLA_PLUGINID "blackwhistle.com/HostServices")
 
 # strings
 set(FBSTRING_CompanyName "Blackwhistle")
@@ -37,10 +37,10 @@ set(FBSTRING_FileDescription "SSL-based services for Javascript.")
 set(FBSTRING_PLUGIN_VERSION "1.0.0")
 set(FBSTRING_LegalCopyright "Copyright 2011 Blackwhistle")
 set(FBSTRING_PluginFileName "np${PLUGIN_NAME}.dll")
-set(FBSTRING_ProductName "SecureConnectionServices")
+set(FBSTRING_ProductName "HostServices")
 set(FBSTRING_FileExtents "")
-set(FBSTRING_PluginName "SecureConnectionServices")
-set(FBSTRING_MIMEType "application/x-secureconnectionservices")
+set(FBSTRING_PluginName "HostServices")
+set(FBSTRING_MIMEType "application/x-hostservices")
 
 # Uncomment this next line if you're not planning on your plugin doing
 # any drawing:

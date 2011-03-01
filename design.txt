@@ -1,282 +1,4 @@
-Notes on NaClSsh:
-
-The connection is in file ssh_plugin.cc.  The basic protocol is as
-follows:
-
-1. libssh2_init(0)
-
-   Reference:
-   http://www.libssh2.org/libssh2_init.html
-
-   Declarations:
-   #include <libssh2.h>
-
-   #define LIBSSH2_INIT_NO_CRYPTO 0x0001
-
-   int libssh2_init(int flags);
-
-   Description:
-   Initialize the libssh2 functions. This typically initialize the
-   crypto library. It uses a global state, and is not thread safe --
-   you must make sure this function is not called concurrently.
-
-   Returns 0 on success.
-
-
-2. libssh2_session_init()
-
-   LIBSSH2_SESSION *session;
-   session = libssh2_session_init();
-
-   Reference:
-   http://www.libssh2.org/libssh2_session_init.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   libssh2_session_init(arguments)
-
-   Description:
-   This is a specialization of libssh2_session_init_ex():
-
-   Reference:
-   http://www.libssh2.org/libssh2_session_init_ex.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   LIBSSH2_SESSION *
-   libssh2_session_init_ex(LIBSSH2_ALLOC_FUNC((*myalloc)),
-   LIBSSH2_FREE_FUNC((*myfree)), LIBSSH2_REALLOC_FUNC((*myrealloc)), void
-   *abstract);
-
-   LIBSSH2_SESSION * libssh2_session_init(void);
-
-   Description:
-   myalloc - Custom allocator function. Refer to the section on Callbacks
-   for implementing an allocator callback. Pass a value of NULL to use
-   the default system allocator.
-
-   myfree - Custom de-allocator function. Refer to the section on
-   Callbacks for implementing a deallocator callback. Pass a value of
-   NULL to use the default system deallocator.
-
-   myrealloc - Custom re-allocator function. Refer to the section on
-   Callbacks for implementing a reallocator callback. Pass a value of
-   NULL to use the default system reallocator.
-
-   abstract - Arbitrary pointer to application specific callback
-   data. This value will be passed to any callback function associated
-   with the named session instance.
-
-   Initializes an SSH session object. By default system memory allocators
-   (malloc(), free(), realloc()) will be used for any dynamically
-   allocated memory blocks. Alternate memory allocation functions may be
-   specified using the extended version of this API call, and/or optional
-   application specific data may be attached to the session object.
-
-   This method must be called first, prior to configuring session options
-   or starting up an SSH session with a remote server.
-
-   Returns NULL on errors.
-
-
-3. libssh2_session_set_blocking(session, 0);
-
-   Reference:
-   http://www.libssh2.org/libssh2_session_set_blocking.html    
-
-   Declaration:
-   #include <libssh2.h>
-
-   void libssh2_session_set_blocking(LIBSSH2_SESSION *session, int blocking);
-
-   Description:
-   session - session instance as returned by libssh2_session_init_ex(3)
-
-   blocking - Set to a non-zero value to make the channel block, or zero
-   to make it non-blocking.
-
-   Set or clear blocking mode on the selected on the session. This will
-   instantly affect any channels associated with this session. If a read
-   is performed on a session with no data currently available, a blocking
-   session will wait for data to arrive and return what it receives. A
-   non-blocking session will return immediately with an empty buffer. If
-   a write is performed on a session with no room for more data, a
-   blocking session will wait for room. A non-blocking session will
-   return immediately without writing anything.
-
-
-4. libssh2_session_startup(session, sock);
-
-   Reference:
-   http://linux.die.net/man/3/libssh2_session_startup
-
-   Description:
-   session - Session instance as returned by libssh2_session_init(3)
-   socket - Connected socket descriptor. Typically a TCP connection
-   though the protocol allows for any reliable transport and the library
-   will attempt to use any berkeley socket.
-
-   Begin transport layer protocol negotiation with the connected host.
-
-   Returns 0 on success; negative on failure.
-
-   Notes:
-   In NaClSsh, sock is
-
-   int sock = 1;
-
-   I presume that is STDOUT, file descriptor 1.
-
-   Examples:
-
-   In Polkit on Google Code (objective C):
-   _socket = _CreateSocketConnectedToHost([url host],
-					  ([url port] ? [[url port] unsignedShortValue] :
-					   kDefaultSSHPort), kCFSocketNoCallBack, NULL, NULL);
-   libssh2_session_startup(_session, CFSocketGetNative(_socket));
-     
-
-   In tenderlove/mallcop on GitHub:
-
-   static VALUE start(VALUE self, VALUE sock)
-   {
-     LIBSSH2_SESSION *session;
-     rb_io_t *fptr;
-
-     Data_Get_Struct(self, LIBSSH2_SESSION, session);
-
-     GetOpenFile(sock, fptr);
-
-     return INT2FIX(libssh2_session_startup(session, fptr->fd));
-   }
-
-
-5. libssh2_userauth_password(session, userdata->username.c_str(), userdata->password.c_str())
-
-   Reference:
-   http://www.libssh2.org/libssh2_userauth_password.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   libssh2_userauth_password(arguments)
-
-   Description:
-   This is a macro defined in a public libssh2 header file that is using the
-   underlying function libssh2_userauth_password_ex(3).
-
-   Reference:
-   http://www.libssh2.org/libssh2_userauth_password_ex.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   int libssh2_userauth_password_ex(LIBSSH2_SESSION *session,
-				    const char *username,
-				    unsigned int username_len,
-				    const char *password,
-				    unsigned int password_len,
-				    LIBSSH2_PASSWD_CHANGEREQ_FUNC((*passwd_change_cb)));
-
-
-   #define libssh2_userauth_password(session, username, password)
-     libssh2_userauth_password_ex((session), (username),
-				  strlen(username),
-				  (password), strlen(password), NULL)
-
-
-   Description:
-   session - Session instance as returned by libssh2_session_init_ex(3)
-
-   username - Name of user to attempt plain password authentication for.
-
-   username_len - Length of username parameter.
-
-   password - Password to use for authenticating username.
-
-   password_len - Length of password parameter.
-
-   passwd_change_cb - If the host accepts authentication but requests
-   that the password be changed, this callback will be issued. If no
-   callback is defined, but server required password change,
-   authentication will fail.
-
-   Attempt basic password authentication. Note that many SSH servers
-   which appear to support ordinary password authentication actually
-   have it disabled and use Keyboard Interactive authentication
-   (routed via PAM or another authentication backed) instead.
-
-   Return 0 on success or negative on failure.  It returns
-   LIBSSH2_ERROR_EAGAIN when it would otherwise block. While
-   LIBSSH2_ERROR_EAGAIN is a negative number, it isn't really a
-   failure per se.
-
-
-6. channel = libssh2_channel_open_session(session);
-
-   Reference:
-   http://www.libssh2.org/libssh2_channel_open_session.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   libssh2_channel_open_session(arguments)
-
-
-   Description:
-
-   This is a macro defined in a public libssh2 header file that is using
-   the underlying function libssh2_channel_open_ex(3).
-
-   Reference:
-   http://www.libssh2.org/libssh2_channel_open_ex.html
-
-   Declaration:
-   #include <libssh2.h>
-
-   LIBSSH2_CHANNEL * libssh2_channel_open_ex(LIBSSH2_SESSION *session,
-                                             const char *channel_type,
-                                             unsigned int channel_type_len,
-                                             unsigned int window_size,
-                                             unsigned int packet_size,
-                                             const char *message,
-					     unsigned int message_len);
-
-   LIBSSH2_CHANNEL * libssh2_channel_open_session(session);
-
-   Description:
-   session - Session instance as returned by libssh2_session_init_ex(3)
-
-   channel_type - Channel type to open. Typically one of session,
-   direct-tcpip, or tcpip-forward. The SSH2 protocol allowed for
-   additional types including local, custom channel types.
-
-   channel_type_len - Length of channel_type
-
-   window_size - Maximum amount of unacknowledged data remote host is
-   allowed to send before receiving an SSH_MSG_CHANNEL_WINDOW_ADJUST
-   packet.
-
-   packet_size - Maximum number of bytes remote host is allowed to send
-   in a single SSH_MSG_CHANNEL_DATA or SSG_MSG_CHANNEL_EXTENDED_DATA
-   packet.
-
-   message - Additional data as required by the selected channel_type.
-
-   message_len - Length of message parameter.
-
-   Allocate a new channel for exchanging data with the server. This
-   method is typically called through its macroized form:
-   libssh2_channel_open_session(3) or via libssh2_channel_direct_tcpip(3)
-   or libssh2_channel_forward_listen(3)
-
-
-
-
-    
-Security:
+Security
 
 1. Enforce same origin policy by default; allow exceptions. [client]
 2. Require password entry by default; allow use of stored keys. [client]
@@ -312,3 +34,196 @@ the x and y members of the NPWindow structure, with the clip rectangle
 specified in the clipRect member, and with the Visual and Colormap
 specified in the ws_info member.
 
+
+FireBreath Drawing:
+
+1. Add a refresh event handler to your plugin's object:
+
+  BEGIN_PLUGIN_EVENT_MAP()
+  ...
+  EVENTTYPE_CASE(FB::RefreshEvent, onRefresh, FB::PluginWindow)
+  ...
+  END_PLUGIN_EVENT_MAP()
+
+
+2. Write the refresh handler:
+
+
+
+Open Connection UI Protocol
+
+When a script calls the open method of a SecureConnection object, the plugin
+fires events to notify the script when the plugin will request credentials
+from the user.  This allows the script to make UI changes if desired.
+
+Script                        Plugin
+------------------------------------------------------------------------------
+connection.open()
+
+			      FireEvent("onreadystatechange", ..., OPENING)
+
+Can inform the user that the connection has
+begun to open.
+
+			      Connection requests UI from plugin.
+			      Connection receives UI from plugin.
+			      FireEvent("onrequestcredentials", connection)
+
+Can set css attributes on the embeded object, or
+call the setAttribute method of the connection
+object to reflect that input is expected.
+
+			      Waits for the user to press enter or cancel.
+
+			      -- either --
+			      
+			      FireEvent("onreceivedcredentials", connection)
+
+			      -- or --
+
+			      FireEvent("oncanceledrequest", connection)
+
+			      --
+
+Can set css attributes on the embeded object, or
+call the setAttribute method of the connection
+object to reflect that input is completed.
+
+			      (If another connection is waiting for the UI, it
+			      will now have its request filled.)
+
+			      Plugin attempts to use credentials to begin SSL
+			      session on behalf of user at remote host
+
+			      -- either --
+
+			      FireEvent("onreadystatechange", ..., OPEN)
+
+Can inform the user that the connection is open.
+
+                              -- or --
+
+			      FireEvent("onerror", ...)
+
+Can inform user of error.
+    
+			      FireEvent("onreadystatechange", ..., CLOSING)
+			      
+			      Plugin cleans up resources and shuts down
+			      whatever SSL resources were successfully
+			      obtained.
+
+			      FireEvent("onreadystatechange", ..., CLOSED)
+
+    			      --
+	
+Because a single plugin object may manage the UI for several different
+connections and because of the asyncronous nature of Javascript, it is
+necessary to maintain a thread-safe queue of connections that wish to request
+credentials from the user.  (In practice this queue will nearly always be
+empty or have only one element in it.)  On open, the connection schedules
+itself with the plugin for the use of the UI.  UI requests are handled
+sequentially in the order they are received, with the earlier request
+completing with either an enter or an escape before the later request is
+shown.
+
+The UI request queue should be scheduled from the main thread.  The plugin
+provides a public method that calls a private method on the main thread to add
+a request to the queue.  If the queue is empty and the UI is available then
+the request is not queued but dispatched directly; otherwise, the request is
+queued.  When the UI signals that the user has pressed either enter or cancel,
+then a private method on the main thread is called.  It notifies the
+connection of the result, either with the password or an indication that the
+request was canceled.  If there is a request waiting in the queue, it is then
+handled.
+
+New methods on HostServicesPlugin
+
+private void setEnableUIButtons(bool enable)
+
+Enables or disables the UI buttons according to its argument.
+
+private void setCurrentConnection(SecureConnectionPtr connection)
+
+Updates the m_connection member.  If the connection is NULL, then disables the
+UI buttons and clears the labels.  If the connection is not NULL, then enables
+the UI buttons and sets the label with the userName and hostName properties
+from the connection.  Notify the connection that it is receiving the UI.
+
+private void releaseUI()
+
+** This must run on the main thread only.** It checks the UI request queue,
+and if it is not empty, it takes the oldest item and makes that the new
+current credential request; if the queue is empty, it clears the current
+request.  Never fails or throws.
+
+private void requestUI(SecureConnectionPtr connection)
+
+** This must run on the main thread only. ** If the UI is not in use, then
+make the request the current request. If the UI is in use, add the request to
+the queue.  Never fails or throws.
+
+public void scheduleUIRequest(SecureConnectionPtr connection)
+
+Schedules the request on the main thread.  Never fails or throws.
+
+protected void scheduleUIRelease(bool ok, const std::string& password)
+
+This is called by the signal handler for each of the buttons in the UI.  It
+notifies the connection of the user's response: either that the request was
+canceled, or the password provided by the user.  Disables the UI buttons.
+Never fails of throws.
+
+private void setUILabels(const std::string& hostName, const std::string& userName)
+
+Fills in the label template and puts the text in the label.
+
+private SecureConnectionPtr current_connection
+
+A member which is non-NULL when the UI is in use; holds the connection for
+which the UI is currently requesting credentials.
+
+private std::deque<SecureConnectionPtr> request_queue
+
+The request queue. Changes to the queue are only allowed from the main thread.
+
+private void cancelButtonPressed()
+
+Signal handler for the cancel button.  Clear the entry.  Call
+scheduleUIRelease(false, "").
+
+private void okButtonPressed()
+
+Signal handler for the ok button.  Get the text from the entry; clear the
+entry. Call scheduleUIRelease(true, password).
+
+private std::string getEntryText()
+
+Gets the text from the password entry.
+
+private void clearEntryText()
+
+Clears the text in the password entry.
+
+
+
+
+
+Default UI For Plugin
+
+GTK+
+
+  VBox
+    Label: 'Password for <userName>@<hostName>'
+    Entry (password)
+    HBox
+      Button Stock OK
+      Button Stock Cancel
+
+
+
+Design Questions:
+
+2. Why is the X11 default to add a drawing widget to the plug?
+
+3. Are there any X11 UI examples?

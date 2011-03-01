@@ -1,6 +1,6 @@
 #/**********************************************************\ 
 # Auto-generated X11 project definition file for the
-# SecureConnectionServices project
+# HostServices project
 #\**********************************************************/
 
 # X11 template platform definition CMake file
@@ -30,6 +30,13 @@ add_x11_plugin(${PROJECT_NAME} SOURCES)
 target_link_libraries(${PROJECT_NAME}
     ${PLUGIN_INTERNAL_DEPS}
     libssh2.so
+    atkmm-1.6.so
+    cairomm-1.0.so
+    gdkmm-2.4.so
+    giomm-2.4.so
+    glibmm-2.4.so
+    gtkmm-2.4.so
+    pangomm-1.4.so
     /lib/libz.so.1.2.3.3
     /lib/libgcrypt.so.11.5.2
     )

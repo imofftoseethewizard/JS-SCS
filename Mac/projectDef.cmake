@@ -1,6 +1,6 @@
 #/**********************************************************\ 
 # Auto-generated Mac project definition file for the
-# SecureConnectionServices project
+# HostServices project
 #\**********************************************************/
 
 # Mac template platform definition CMake file

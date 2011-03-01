@@ -1,6 +1,6 @@
 #/**********************************************************\ 
 # Auto-generated Windows project definition file for the
-# SecureConnectionServices project
+# HostServices project
 #\**********************************************************/
 
 # Windows template platform definition CMake file
@@ -57,7 +57,7 @@ set(WIX_HEAT_FLAGS
     )
 
 add_wix_installer( ${PLUGIN_NAME}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Win/WiX/SecureConnectionServicesInstaller.wxs
+    ${CMAKE_CURRENT_SOURCE_DIR}/Win/WiX/HostServicesInstaller.wxs
     PluginDLLGroup
     ${FB_BIN_DIR}/${PLUGIN_NAME}/${CMAKE_CFG_INTDIR}/
     ${FB_BIN_DIR}/${PLUGIN_NAME}/${CMAKE_CFG_INTDIR}/${FBSTRING_PluginFileName}.dll

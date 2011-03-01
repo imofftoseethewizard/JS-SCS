@@ -3,12 +3,12 @@
  Auto-generated Factory.cpp
  
  This file contains the auto-generated factory methods 
- for the SecureConnectionServicesPlugin project
+ for the HostServicesPlugin project
  
 \**********************************************************/
 
 #include "FactoryBase.h"
-#include "SecureConnectionServicesPlugin.h"
+#include "HostServicesPlugin.h"
 #include <boost/make_shared.hpp>
 
 class PluginFactory : public FB::FactoryBase
@@ -22,7 +22,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////////
     FB::PluginCorePtr createPlugin(const std::string& mimetype)
     {
-        return boost::make_shared<SecureConnectionServicesPlugin>();
+        return boost::make_shared<HostServicesPlugin>();
     }
     
     ///////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////////
     void globalPluginInitialize()
     {
-        SecureConnectionServicesPlugin::StaticInitialize();
+        HostServicesPlugin::StaticInitialize();
     }
     
     ///////////////////////////////////////////////////////////////////////////////
@@ -38,7 +38,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////////
     void globalPluginDeinitialize()
     {
-        SecureConnectionServicesPlugin::StaticDeinitialize();
+        HostServicesPlugin::StaticDeinitialize();
     }
 };
 

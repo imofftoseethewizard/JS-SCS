@@ -3,27 +3,27 @@
   SecureConnection.h
 
   SecureConnection wraps an SSL connection with a remote host. It reads the
-  configuration information below ~/.jsscs/config on the remote host and
+  configuration information below ~/.jshs/config on the remote host and
   offers only those services which are configured. It checks that the url of
   the foreign host is allowed by the same origin policy. It ensures that
   SSL sessions are closed and freed when this object is reclaimed.
 
   ---------------------------------------------------------------------------
 
-  This file is part of JS/SCS.
+  This file is part of JS/HS.
 
-  JS/SCS is free software: you can redistribute it and/or modify it under the
+  JS/HS is free software: you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
   Foundation, either version 3 of the License, or (at your option) any later
   version.
 
-  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  JS/HS is distributed in the hope that it will be useful, but WITHOUT ANY
   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
   FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
   details.
 
   You should have received a copy of the GNU General Public License along with
-  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+  JS/HS.  If not, see <http://www.gnu.org/licenses/>.
 
   ---------------------------------------------------------------------------
 
@@ -31,6 +31,9 @@
 
  ******************************************************************************/
 
+
+#ifndef H_SecureConnection
+#define H_SecureConnection
 
 #include <string>
 
@@ -40,10 +43,8 @@
 #include <boost/weak_ptr.hpp>
 
 #include "JSAPIAuto.h"
-#include "SecureConnectionServices.h"
+#include "HostServices.h"
 
-#ifndef H_SecureConnection
-#define H_SecureConnection
 
 FB_FORWARD_PTR(Service);
 FB_FORWARD_PTR(SecureConnection);
@@ -53,7 +54,7 @@ class SecureConnection : public FB::JSAPIAuto
  public:
   friend class FileService;
 
-  SecureConnection(SecureConnectionServicesPtr plugin,
+  SecureConnection(HostServicesPtr plugin,
 		   const std::string& user,
 		   const std::string& hostName,
 		   unsigned int port);
@@ -92,16 +93,11 @@ class SecureConnection : public FB::JSAPIAuto
   FB::VariantList get_services() const;
   FB::VariantList get_serviceSchemes() const;
 
-  enum HostCheckResult {
-    KNOWN_HOST_CHECK_FAILURE = 1,
-    UNKNOWN_HOST,
-    KNOWN_HOST_KEY_MISMATCH
-  };
-
-  void openAsync();
-
   void requestServiceByScheme(const std::string& scheme);
   void releaseService(ServicePtr service);
+
+  void credentialsRequestFilled(const std::string& password);
+  void credentialsRequestDenied();
 
   void closeConnection();
 
@@ -110,6 +106,7 @@ class SecureConnection : public FB::JSAPIAuto
   void reportError(const FB::script_error& e);
 
   void open();
+  void completeOpen();
 
   bool isOriginAllowed();
   void createSocket();
@@ -121,12 +118,9 @@ class SecureConnection : public FB::JSAPIAuto
   void grantService(ServicePtr service);
   void revokeAllServices();
 
-  //  void requestCredentials();
-
-  //  void checkKnownHost(boost::optional<const FB::JSObjectPtr&> callbackAdviseUnknownHost);
 
  private:
-  SecureConnectionServicesWeakPtr m_scs;
+  HostServicesWeakPtr m_hs;
     
   std::string m_user;
   std::string m_password;

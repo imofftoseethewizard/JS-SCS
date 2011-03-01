@@ -5,20 +5,20 @@
   
   ---------------------------------------------------------------------------
 
-  This file is part of JS/SCS.
+  This file is part of JS/HS.
 
-  JS/SCS is free software: you can redistribute it and/or modify it under the
+  JS/HS is free software: you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
   Foundation, either version 3 of the License, or (at your option) any later
   version.
 
-  JS/SCS is distributed in the hope that it will be useful, but WITHOUT ANY
+  JS/HS is distributed in the hope that it will be useful, but WITHOUT ANY
   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
   FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
   details.
 
   You should have received a copy of the GNU General Public License along with
-  JS/SCS.  If not, see <http://www.gnu.org/licenses/>.
+  JS/HS.  If not, see <http://www.gnu.org/licenses/>.
 
   ---------------------------------------------------------------------------
 
@@ -103,13 +103,13 @@ line begins with whitespace, then the path is considered relative to the
 path of the prior line.  (It must be true both that the prior line is
 an access specifier, and that the path in the present is relative.)  E.g,
 
-~/.jsscs/config/file:
+~/.jshs/config/file:
 [readonly]
 +~
 
 [noaccess]
 +~/.ssh
-+~/.jsscs
++~/.jshs
 +~/.../*~
 
 [readwrite]
@@ -118,7 +118,7 @@ an access specifier, and that the path in the present is relative.)  E.g,
  -old
 
 The above specifies first that all files are readonly.  The noaccess section
-removes the .ssh and .jsscs subtrees, so that they may neither be read
+removes the .ssh and .jshs subtrees, so that they may neither be read
 nor written to.  Also, any file whose last component ends with ~ is excluded.
 Finally, read and write is allowed in the src subtree, though that is qualified
 to exclude any path that includes a .git component.
